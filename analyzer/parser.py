@@ -1,15 +1,16 @@
-import re
+import email
 
-def parse_headers(raw):
-    headers = {}
+def parse_headers(raw_headers):
+    msg = email.message_from_string(raw_headers)
 
-    lines = raw.split("\n")
+    parsed = {
+        "From": msg.get("From"),
+        "To": msg.get("To"),
+        "Subject": msg.get("Subject"),
+        "Return-Path": msg.get("Return-Path"),
+        "Authentication-Results": msg.get("Authentication-Results"),
+        "Received": msg.get_all("Received", []),
+        "Message-ID": msg.get("Message-ID")
+    }
 
-    for line in lines:
-        if ":" in line:
-            key, value = line.split(":", 1)
-            headers[key.strip()] = value.strip()
-
-    headers["received"] = re.findall(r"Received: (.*)", raw)
-
-    return headers
+    return parsed
