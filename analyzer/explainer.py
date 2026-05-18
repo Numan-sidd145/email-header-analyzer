@@ -1,55 +1,27 @@
-def generate_explanation(headers, spf, dkim, dmarc, risk_score, verdict):
-    reasons = []
-    positives = []
+def generate_explanation(headers, spf, dkim, dmarc, risk_score, verdict, risk_reasons):
+    safe_points = []
 
-    # --- SPF ---
     if spf["result"] == "pass":
-        positives.append("SPF passed: Sending server is authorized.")
-    else:
-        reasons.append("SPF failed: Sender may not be authorized.")
-
-    # --- DKIM ---
+        safe_points.append("SPF passed, so the sending server is authorized.")
     if dkim["result"] == "pass":
-        positives.append("DKIM passed: Email content integrity verified.")
-    else:
-        reasons.append("DKIM failed or missing: Message may be altered.")
-
-    # --- DMARC ---
+        safe_points.append("DKIM passed, so the message was not altered.")
     if dmarc["result"] == "pass":
-        positives.append("DMARC passed: Domain alignment verified.")
+        safe_points.append("DMARC passed, so the sender domain is aligned correctly.")
+
+    if not risk_reasons:
+        risk_reasons = ["No major suspicious indicators were detected in the header analysis."]
+
+    if verdict == "Safe":
+        summary = "This email appears legitimate."
+    elif verdict == "Suspicious":
+        summary = "This email has warning signs and should be verified before trusting it."
     else:
-        reasons.append("DMARC missing or failed: No strong anti-spoofing protection.")
+        summary = "This email appears risky and may be a phishing or spoofing attempt."
 
-    # --- Spoofing Check ---
-    from_addr = headers.get("From", "")
-    return_path = headers.get("Return-Path", "")
-
-    if "@" in from_addr and "@" in return_path:
-        from_domain = from_addr.split("@")[-1].strip(">")
-        return_domain = return_path.split("@")[-1].strip(">")
-
-        if from_domain != return_domain:
-            reasons.append("Mismatch between From and Return-Path domains (possible spoofing).")
-
-    # --- Subject Analysis ---
-    subject = headers.get("Subject", "").lower()
-
-    suspicious_words = ["urgent", "blocked", "verify", "suspend", "alert", "password"]
-
-    if any(word in subject for word in suspicious_words):
-        reasons.append("Subject contains urgency or threat language (common in phishing).")
-
-    # --- Received Chain ---
-    received = headers.get("received", [])
-    if len(received) > 3:
-        reasons.append("Email passed through multiple relay servers (possible obfuscation).")
-
-    # --- Final Explanation ---
-    explanation = {
+    return {
         "verdict": verdict,
         "risk_score": risk_score,
-        "why_suspicious": reasons,
-        "why_safe": positives
+        "summary": summary,
+        "why_suspicious": risk_reasons,
+        "why_safe": safe_points
     }
-
-    return explanation
